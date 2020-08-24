@@ -1,3 +1,6 @@
+" Current file
+let s:directory = expand('<sfile>:h')
+
 " Log a message
 function! s:log(message)
   " Bail if not logging
@@ -118,29 +121,11 @@ function! s:shellescape_list(l)
   return join(result, ' ')
 endfunction
 
-" Detect what version of script to use based on OS
-if has('unix')
-  let s:uname = system('uname -s')
-  if s:uname =~# 'Darwin' || s:uname =~# 'BSD'
-    call s:log('Darwin/BSD detected, using `script -q /dev/null $bin`')
-    function! s:scriptify(bin)
-      " We need to keep the arguments plain
-      return ['script', '-q', '/dev/null'] + a:bin
-    endfunction
-  else
-    call s:log('Linux detected, using `script -qfec "$bin" /dev/null`')
-    function! s:scriptify(bin)
-      " We need to make bin one string argument
-      let tmp_bin = '/tmp/cmd'
-      call writefile([s:shellescape_list(a:bin)], tmp_bin)
-      call setfperm(tmp_bin, 'rwx------')
-      return ['script', '-qfec', tmp_bin, '/dev/null']
-    endfunction
-  endif
-else
-  call s:log ('Windows detected, erroring out')
-  call s:err('Codi does not support Windows yet.')
-endif
+" Pass arguments to pty script
+function! s:scriptify(bin)
+  " return ['script', '-q', '/dev/null'] + a:bin
+  return ['env', 'python', s:directory . '/' . 'script.py'] + a:bin
+endfunction
 
 " Actions on codi
 augroup CODI
@@ -370,7 +355,8 @@ function! codi#update()
   if !s:is_virtual_text_enabled() && !s:get_codi('bufnr') | return | endif
 
   call s:user_au('CodiUpdatePre')
-  silent call s:codi_do_update()
+  " silent call s:codi_do_update()
+  call s:codi_do_update()
 
   " Only trigger post if sync
   if !s:get_opt('async')
@@ -672,7 +658,7 @@ function! s:nvim_codi_output_to_virtual_text(bufnr, lines)
     if len(line)
       let s:virtual_text_namespace = nvim_buf_set_virtual_text(a:bufnr,
        \ s:virtual_text_namespace, i,
-       \ [[g:codi#virtual_text_prefix . line, "CodiVirtualText"]], {})   
+       \ [[g:codi#virtual_text_prefix . line, 'CodiVirtualText']], {})
     else
       call nvim_buf_clear_namespace(a:bufnr, -1, i, i+1)
     endif
@@ -779,7 +765,8 @@ function! s:codi_spawn(filetype)
   if !s:is_virtual_text_enabled()
     call s:let_codi('bufnr', bufnr('$'))
   endif
-  silent call codi#update()
+  " silent call codi#update()
+  call codi#update()
   call s:user_au('CodiEnterPost')
 endfunction
 
